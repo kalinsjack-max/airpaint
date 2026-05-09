@@ -3,229 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Air Painter</title>
+    <title>Magic Neon Air Painter</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;600&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --neon-color: #00f2ff;
-        }
+        :root { --neon: #00f2ff; }
         body {
-            background-color: #050505;
-            color: #e0e0e0;
+            background-color: #020202;
             margin: 0;
             overflow: hidden;
             font-family: 'Inter', sans-serif;
-            user-select: none;
+            color: white;
         }
         canvas {
             position: absolute;
             top: 0;
             left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        .ui-layer {
+            position: absolute;
+            z-index: 100;
+            pointer-events: none;
             width: 100%;
             height: 100%;
         }
+        .interactive { pointer-events: auto; }
         .glass {
-            background: rgba(15, 15, 15, 0.7);
-            backdrop-filter: blur(12px);
+            background: rgba(10, 10, 10, 0.75);
+            backdrop-filter: blur(15px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
         }
         #video-preview {
             position: absolute;
-            bottom: 24px;
-            right: 24px;
-            width: 200px;
-            height: 150px;
-            border-radius: 16px;
+            bottom: 30px;
+            right: 30px;
+            width: 220px;
+            height: 165px;
+            border-radius: 20px;
             transform: scaleX(-1);
             object-fit: cover;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            z-index: 50;
+            border: 2px solid rgba(255,255,255,0.1);
+            z-index: 10;
         }
         .orbitron { font-family: 'Orbitron', sans-serif; }
         
-        /* Custom range styling */
         input[type=range] {
             -webkit-appearance: none;
+            width: 100%;
             background: rgba(255,255,255,0.1);
-            border-radius: 5px;
             height: 4px;
+            border-radius: 2px;
         }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 18px;
-            width: 18px;
+            height: 20px;
+            width: 20px;
             border-radius: 50%;
-            background: white;
+            background: #fff;
+            box-shadow: 0 0 15px var(--neon);
             cursor: pointer;
-            box-shadow: 0 0 10px var(--neon-color);
         }
     </style>
 </head>
 <body>
 
-    <div id="app" class="relative w-screen h-screen">
-        <!-- Layered Canvases -->
-        <canvas id="bg-canvas"></canvas> <!-- Background/Static -->
-        <canvas id="paint-canvas"></canvas> <!-- Persistent lines -->
-        <canvas id="particle-canvas"></canvas> <!-- Sparkles and real-time effects -->
+    <!-- Rendering Layers -->
+    <canvas id="paint-layer"></canvas>
+    <canvas id="fx-layer"></canvas>
 
-        <!-- Top UI -->
-        <div class="absolute top-8 left-8 z-50 flex flex-col gap-6">
-            <div class="glass p-6 rounded-2xl w-72">
-                <h1 class="orbitron text-xl font-bold tracking-widest text-white mb-1">NEON AR</h1>
-                <p class="text-[10px] text-gray-400 uppercase tracking-tighter mb-6">Gesture Motion Engine v2.0</p>
-                
-                <div class="space-y-5">
+    <div class="ui-layer p-8 flex flex-col justify-between">
+        <!-- Control Panel -->
+        <div class="flex justify-between items-start">
+            <div class="glass p-6 rounded-3xl w-80 interactive">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_#22d3ee]"></div>
+                    <h1 class="orbitron text-lg font-bold tracking-widest text-white">NEON ENGINE</h1>
+                </div>
+
+                <div class="space-y-6">
                     <div>
-                        <div class="flex justify-between mb-2">
-                            <label class="text-xs font-medium text-gray-300">Core Frequency</label>
-                            <span id="color-hex" class="text-[10px] orbitron" style="color: var(--neon-color);">#00F2FF</span>
+                        <div class="flex justify-between text-[10px] orbitron mb-2 tracking-widest text-gray-400">
+                            <span>COLOR FREQUENCY</span>
+                            <span id="hex-label" style="color: var(--neon)">#00F2FF</span>
                         </div>
-                        <input type="color" id="color-picker" value="#00f2ff" class="w-full h-8 rounded bg-transparent border-none cursor-pointer">
+                        <input type="color" id="color-picker" value="#00f2ff" class="w-full h-10 rounded-xl bg-transparent border-none cursor-pointer">
                     </div>
 
                     <div>
-                        <div class="flex justify-between mb-2">
-                            <label class="text-xs font-medium text-gray-300">Beam Width</label>
-                            <span id="thick-val" class="text-[10px] orbitron">12px</span>
+                        <div class="flex justify-between text-[10px] orbitron mb-2 tracking-widest text-gray-400">
+                            <span>BEAM INTENSITY</span>
+                            <span id="size-label">15PX</span>
                         </div>
-                        <input type="range" id="thick-slider" min="4" max="60" value="12" class="w-full">
+                        <input type="range" id="size-slider" min="5" max="80" value="15">
                     </div>
 
-                    <button id="clear-btn" class="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all active:scale-95 uppercase tracking-widest">
-                        Purge Memory
+                    <button id="clear-btn" class="w-full py-4 glass hover:bg-white/10 rounded-2xl text-[10px] orbitron font-bold tracking-[0.3em] text-white transition-all active:scale-95 uppercase">
+                        Clear Workspace
                     </button>
                 </div>
             </div>
 
-            <!-- Gesture Legend -->
-            <div class="glass p-4 rounded-2xl text-[10px] flex flex-col gap-3 text-gray-400">
-                <div class="flex items-center gap-3">
-                    <span class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold">☝️</span>
-                    <span>INDEX UP: <b class="text-white">IGNITE BEAM</b></span>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 font-bold">🖐️</span>
-                    <span>OPEN PALM: <b class="text-white">DISSOLVE (ERASE)</b></span>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span class="w-8 h-8 rounded-lg bg-gray-500/20 flex items-center justify-center text-gray-400 font-bold">✊</span>
-                    <span>FIST: <b class="text-white">STASIS (PAUSE)</b></span>
+            <!-- Awesome Status Display -->
+            <div id="status-display" class="glass px-6 py-4 rounded-full flex items-center gap-4 transition-all duration-300">
+                <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 shadow-lg"></div>
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-gray-400 font-bold tracking-tighter uppercase">System Status</span>
+                    <span id="status-mode" class="orbitron text-xs font-bold tracking-widest">INITIALIZING</span>
                 </div>
             </div>
         </div>
 
-        <!-- Mode Indicator -->
-        <div class="absolute bottom-8 left-8 z-50">
-            <div id="status-pill" class="glass px-4 py-2 rounded-full border border-white/20 flex items-center gap-3">
-                <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-500 animate-pulse"></div>
-                <span id="status-text" class="orbitron text-[10px] uppercase tracking-widest">Awaiting Input...</span>
+        <!-- Legend -->
+        <div class="glass p-5 rounded-3xl w-fit flex gap-8 text-gray-400">
+            <div class="flex items-center gap-3">
+                <span class="text-xl">☝️</span>
+                <span class="text-[10px] orbitron font-medium tracking-widest">POINT = <span class="text-white">DRAW</span></span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-xl">🖐️</span>
+                <span class="text-[10px] orbitron font-medium tracking-widest">PALM = <span class="text-white">ERASE</span></span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-xl">✊</span>
+                <span class="text-[10px] orbitron font-medium tracking-widest">FIST = <span class="text-white">PAUSE</span></span>
             </div>
         </div>
-
-        <video id="video-preview" autoplay playsinline></video>
     </div>
 
+    <video id="video-preview" autoplay playsinline></video>
+
     <script>
-        const paintCanvas = document.getElementById('paint-canvas');
-        const partCanvas = document.getElementById('particle-canvas');
-        const pCtx = paintCanvas.getContext('2d');
-        const mCtx = partCanvas.getContext('2d');
+        const pCanvas = document.getElementById('paint-layer');
+        const fCanvas = document.getElementById('fx-layer');
+        const pCtx = pCanvas.getContext('2d');
+        const fCtx = fCanvas.getContext('2d');
         const video = document.getElementById('video-preview');
         
+        // UI Refs
         const colorPicker = document.getElementById('color-picker');
-        const thickSlider = document.getElementById('thick-slider');
-        const thickVal = document.getElementById('thick-val');
+        const sizeSlider = document.getElementById('size-slider');
+        const statusMode = document.getElementById('status-mode');
+        const statusIndicator = document.getElementById('status-indicator');
         const clearBtn = document.getElementById('clear-btn');
-        const statusText = document.getElementById('status-text');
-        const statusDot = document.getElementById('status-dot');
 
         let brushColor = '#00f2ff';
-        let brushSize = 12;
+        let brushSize = 15;
         let particles = [];
         
-        // Smoothing Variables (Lerp)
+        // Motion Core
         let targetX = 0, targetY = 0;
-        let currentX = 0, currentY = 0;
+        let curX = window.innerWidth / 2;
+        let curY = window.innerHeight / 2;
         let lastX = 0, lastY = 0;
-        let isActive = false;
+        let isDrawing = false;
         let currentMode = 'IDLE';
 
-        function init() {
-            resize();
-            window.addEventListener('resize', resize);
-            
-            colorPicker.addEventListener('input', (e) => {
-                brushColor = e.target.value;
-                document.documentElement.style.setProperty('--neon-color', brushColor);
-                document.getElementById('color-hex').innerText = brushColor.toUpperCase();
-            });
-            
-            thickSlider.addEventListener('input', (e) => {
-                brushSize = parseInt(e.target.value);
-                thickVal.innerText = brushSize + 'px';
-            });
-
-            clearBtn.addEventListener('click', () => {
-                pCtx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
-                particles = [];
-            });
-
-            animate();
-        }
-
         function resize() {
-            paintCanvas.width = window.innerWidth;
-            paintCanvas.height = window.innerHeight;
-            partCanvas.width = window.innerWidth;
-            partCanvas.height = window.innerHeight;
-            pCtx.lineCap = 'round';
-            pCtx.lineJoin = 'round';
+            pCanvas.width = fCanvas.width = window.innerWidth;
+            pCanvas.height = fCanvas.height = window.innerHeight;
+            pCtx.lineCap = pCtx.lineJoin = 'round';
         }
 
-        // Particle Class for the "Sparkle"
-        class Particle {
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Particle Class
+        class Sparkle {
             constructor(x, y, color) {
                 this.x = x;
                 this.y = y;
-                this.size = Math.random() * 3 + 1;
-                this.speedX = (Math.random() - 0.5) * 6;
-                this.speedY = (Math.random() - 0.5) * 6;
-                this.color = color;
+                this.vx = (Math.random() - 0.5) * 12;
+                this.vy = (Math.random() - 0.5) * 12;
                 this.life = 1.0;
-                this.decay = Math.random() * 0.02 + 0.015;
+                this.color = color;
+                this.size = Math.random() * 4 + 2;
             }
             update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                this.life -= this.decay;
-                if (this.size > 0.1) this.size -= 0.05;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= 0.025;
+                this.size *= 0.95;
             }
-            draw() {
-                mCtx.fillStyle = this.color;
-                mCtx.globalAlpha = this.life;
-                mCtx.beginPath();
-                mCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                mCtx.fill();
+            draw(ctx) {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
-        function updateStatus(mode) {
+        // Status Logic
+        function setStatus(mode) {
+            if (currentMode === mode) return;
             currentMode = mode;
-            statusText.innerText = mode;
-            if (mode === 'DRAWING') {
-                statusDot.className = 'w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]';
-            } else if (mode === 'ERASING') {
-                statusDot.className = 'w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]';
-            } else {
-                statusDot.className = 'w-2 h-2 rounded-full bg-gray-500';
-            }
+            statusMode.innerText = mode;
+            
+            const colors = {
+                'DRAWING': { bg: '#22d3ee', shadow: '#22d3ee' },
+                'ERASING': { bg: '#ef4444', shadow: '#ef4444' },
+                'STASIS': { bg: '#94a3b8', shadow: '#000000' },
+                'IDLE': { bg: '#ffffff', shadow: '#ffffff' },
+                'NO SIGNAL': { bg: '#334155', shadow: '#000000' }
+            };
+            
+            const cfg = colors[mode] || colors['IDLE'];
+            statusIndicator.style.backgroundColor = cfg.bg;
+            statusIndicator.style.boxShadow = `0 0 15px ${cfg.shadow}`;
         }
 
+        // Initialize MediaPipe
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
@@ -244,39 +238,42 @@
                 const middle = hand[12];
                 const ring = hand[16];
                 const pinky = hand[20];
-                const wrist = hand[0];
 
-                targetX = (1 - index.x) * window.innerWidth;
-                targetY = index.y * window.innerHeight;
+                // COORDINATE MAPPING (Wider sensitivity for full screen reach)
+                // We use a centered focus area (0.2 to 0.8) and expand it to 0-1
+                let rawX = (index.x - 0.2) / 0.6;
+                let rawY = (index.y - 0.2) / 0.6;
+                
+                targetX = (1 - Math.max(0, Math.min(1, rawX))) * window.innerWidth;
+                targetY = Math.max(0, Math.min(1, rawY)) * window.innerHeight;
 
-                // Smoothing (Lerp)
-                currentX += (targetX - currentX) * 0.35;
-                currentY += (targetY - currentY) * 0.35;
+                // Smooth Interpolation
+                curX += (targetX - curX) * 0.45;
+                curY += (targetY - curY) * 0.45;
 
-                // Gesture Logic
-                const isIndexUp = index.y < hand[6].y;
-                const isMiddleDown = middle.y > hand[10].y;
-                const isPalmOpen = index.y < hand[6].y && middle.y < hand[10].y && ring.y < hand[14].y;
-                const isFist = index.y > hand[6].y && middle.y > hand[10].y && ring.y > hand[14].y;
-
-                if (isPalmOpen) {
-                    updateStatus('ERASING');
-                    performErase(currentX, currentY);
-                    isActive = false;
-                } else if (isFist) {
-                    updateStatus('STASIS');
-                    isActive = false;
-                } else if (isIndexUp && isMiddleDown) {
-                    updateStatus('DRAWING');
-                    performDraw(currentX, currentY);
-                    isActive = true;
+                // Hand Logic
+                const indexUp = index.y < hand[6].y;
+                const middleUp = middle.y < hand[10].y;
+                const ringUp = ring.y < hand[14].y;
+                
+                if (indexUp && middleUp && ringUp) {
+                    setStatus('ERASING');
+                    erase(curX, curY);
+                    isDrawing = false;
+                } else if (!indexUp && !middleUp && !ringUp) {
+                    setStatus('STASIS');
+                    isDrawing = false;
+                } else if (indexUp && !middleUp) {
+                    setStatus('DRAWING');
+                    draw(curX, curY);
+                    isDrawing = true;
                 } else {
-                    updateStatus('IDLE');
-                    isActive = false;
+                    setStatus('IDLE');
+                    isDrawing = false;
                 }
             } else {
-                updateStatus('NO SIGNAL');
-                isActive = false;
+                setStatus('NO SIGNAL');
+                isDrawing = false;
             }
         });
 
@@ -286,50 +283,43 @@
         });
         camera.start();
 
-        function performDraw(x, y) {
-            if (!isActive) {
+        function draw(x, y) {
+            if (!isDrawing) {
                 lastX = x;
                 lastY = y;
                 return;
             }
 
-            // Draw to the persistent canvas
             pCtx.save();
-            
-            // Multiple passes for high-end glow
-            // Pass 1: Wide Soft Glow
-            pCtx.shadowBlur = brushSize * 2;
+            // Glow effect
+            pCtx.shadowBlur = brushSize * 1.5;
             pCtx.shadowColor = brushColor;
             pCtx.strokeStyle = brushColor;
             pCtx.lineWidth = brushSize;
-            pCtx.globalAlpha = 0.3;
+            pCtx.globalAlpha = 0.5;
             pCtx.beginPath();
             pCtx.moveTo(lastX, lastY);
             pCtx.lineTo(x, y);
             pCtx.stroke();
 
-            // Pass 2: Bright Core
+            // Core center
             pCtx.shadowBlur = 0;
-            pCtx.strokeStyle = '#ffffff';
+            pCtx.strokeStyle = 'white';
             pCtx.lineWidth = brushSize * 0.3;
-            pCtx.globalAlpha = 0.8;
-            pCtx.beginPath();
-            pCtx.moveTo(lastX, lastY);
-            pCtx.lineTo(x, y);
+            pCtx.globalAlpha = 1.0;
             pCtx.stroke();
-            
             pCtx.restore();
 
-            // Spawn sparkles
-            for (let i = 0; i < 3; i++) {
-                particles.push(new Particle(x, y, brushColor));
+            // Create Sparkles
+            for (let i = 0; i < 5; i++) {
+                particles.push(new Sparkle(x, y, brushColor));
             }
 
             lastX = x;
             lastY = y;
         }
 
-        function performErase(x, y) {
+        function erase(x, y) {
             pCtx.save();
             pCtx.globalCompositeOperation = 'destination-out';
             pCtx.beginPath();
@@ -337,29 +327,47 @@
             pCtx.fill();
             pCtx.restore();
             
-            // Red sparks for erasing
-            particles.push(new Particle(x, y, '#ff4444'));
+            // Add "dust" particles when erasing
+            if (Math.random() > 0.5) particles.push(new Sparkle(x, y, '#ff0000'));
         }
 
         function animate() {
-            mCtx.clearRect(0, 0, partCanvas.width, partCanvas.height);
+            fCtx.clearRect(0, 0, fCanvas.width, fCanvas.height);
             
-            // Draw Cursor/Aura on particle canvas
+            // Draw Interactive Cursor
             if (currentMode !== 'NO SIGNAL') {
-                mCtx.save();
-                mCtx.shadowBlur = 20;
-                mCtx.shadowColor = currentMode === 'ERASING' ? '#ff0000' : brushColor;
-                mCtx.fillStyle = 'rgba(255,255,255,0.2)';
-                mCtx.beginPath();
-                mCtx.arc(currentX, currentY, brushSize, 0, Math.PI * 2);
-                mCtx.fill();
-                mCtx.restore();
+                const color = currentMode === 'ERASING' ? '#ff4444' : (currentMode === 'DRAWING' ? brushColor : '#ffffff');
+                
+                fCtx.save();
+                fCtx.translate(curX, curY);
+                
+                // Pulsing Ring
+                const pulse = Math.sin(Date.now() / 200) * 5;
+                fCtx.strokeStyle = color;
+                fCtx.lineWidth = 2;
+                fCtx.beginPath();
+                fCtx.arc(0, 0, brushSize + 15 + pulse, 0, Math.PI * 2);
+                fCtx.stroke();
+                
+                // Crosshair
+                fCtx.beginPath();
+                fCtx.moveTo(-20, 0); fCtx.lineTo(20, 0);
+                fCtx.moveTo(0, -20); fCtx.lineTo(0, 20);
+                fCtx.stroke();
+                
+                // Mode Text
+                fCtx.fillStyle = color;
+                fCtx.font = 'bold 10px Orbitron';
+                fCtx.textAlign = 'center';
+                fCtx.fillText(currentMode, 0, brushSize + 35);
+                
+                fCtx.restore();
             }
 
-            // Update/Draw Particles
+            // Render Particles
             for (let i = 0; i < particles.length; i++) {
                 particles[i].update();
-                particles[i].draw();
+                particles[i].draw(fCtx);
                 if (particles[i].life <= 0) {
                     particles.splice(i, 1);
                     i--;
@@ -369,7 +377,21 @@
             requestAnimationFrame(animate);
         }
 
-        init();
+        // Listeners
+        colorPicker.addEventListener('input', (e) => {
+            brushColor = e.target.value;
+            document.documentElement.style.setProperty('--neon', brushColor);
+            document.getElementById('hex-label').innerText = brushColor.toUpperCase();
+        });
+        sizeSlider.addEventListener('input', (e) => {
+            brushSize = parseInt(e.target.value);
+            document.getElementById('size-label').innerText = brushSize + 'PX';
+        });
+        clearBtn.addEventListener('click', () => {
+            pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+        });
+
+        animate();
     </script>
 </body>
 </html>
