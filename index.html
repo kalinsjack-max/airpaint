@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Air Painter</title>
+    <!-- MediaPipe Hand Tracking Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #ffffff;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #drawing-canvas {
+            z-index: 10;
+        }
+
+        #video-preview {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 240px;
+            height: 180px;
+            border-radius: 12px;
+            border: 2px solid #333;
+            transform: scaleX(-1); /* Mirror view */
+            z-index: 20;
+            background: #000;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 30;
+            background: rgba(20, 20, 20, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 280px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .status-drawing { background: #10b981; color: white; box-shadow: 0 0 10px #10b981; }
+        .status-erasing { background: #ef4444; color: white; box-shadow: 0 0 10px #ef4444; }
+        .status-paused { background: #6b7280; color: white; }
+
+        input[type="range"] {
+            accent-color: #3b82f6;
+        }
+
+        .cursor-indicator {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 100;
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <!-- Main Drawing Area -->
+        <canvas id="drawing-canvas"></canvas>
+        
+        <!-- Feedback Overlay (Optional for finger dots) -->
+        <canvas id="guide-canvas" style="pointer-events: none; opacity: 0.5;"></canvas>
+
+        <video id="video-preview" autoplay playsinline></video>
+        <div id="cursor" class="cursor-indicator"></div>
+
+        <div class="controls">
+            <h1 class="text-xl font-bold mb-4 tracking-tight">Neon Air Painter</h1>
+            
+            <div id="status-container">
+                <span id="status" class="status-badge status-paused">Initializing...</span>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Brush Color</label>
+                    <input type="color" id="color-picker" value="#00f2ff" class="w-full h-10 rounded cursor-pointer bg-transparent border-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Thickness: <span id="thickness-val">10</span>px</label>
+                    <input type="range" id="thickness-slider" min="2" max="50" value="10" class="w-full">
+                </div>
+
+                <button id="clear-btn" class="w-full py-2 bg-red-600 hover:bg-red-700 transition-colors rounded-lg font-medium text-sm mt-4">
+                    Clear Canvas
+                </button>
+
+                <div class="mt-6 pt-4 border-t border-gray-800 text-[10px] text-gray-500 leading-relaxed">
+                    <p>☝️ <b>Index Finger:</b> Draw</p>
+                    <p>🖐️ <b>Open Palm:</b> Eraser</p>
+                    <p>✊ <b>Closed Fist:</b> Pause</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('video-preview');
+        const drawingCanvas = document.getElementById('drawing-canvas');
+        const guideCanvas = document.getElementById('guide-canvas');
+        const statusEl = document.getElementById('status');
+        const colorPicker = document.getElementById('color-picker');
+        const thicknessSlider = document.getElementById('thickness-slider');
+        const thicknessVal = document.getElementById('thickness-val');
+        const clearBtn = document.getElementById('clear-btn');
+        const cursor = document.getElementById('cursor');
+
+        const ctx = drawingCanvas.getContext('2d');
+        const guideCtx = guideCanvas.getContext('2d');
+
+        let isDrawing = false;
+        let isErasing = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        // Configuration
+        let brushColor = colorPicker.value;
+        let brushSize = parseInt(thicknessSlider.value);
+
+        function resize() {
+            drawingCanvas.width = window.innerWidth;
+            drawingCanvas.height = window.innerHeight;
+            guideCanvas.width = window.innerWidth;
+            guideCanvas.height = window.innerHeight;
+            
+            // Re-fill background to black if needed (or keep transparent for layering)
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Listeners for UI
+        colorPicker.addEventListener('input', (e) => brushColor = e.target.value);
+        thicknessSlider.addEventListener('input', (e) => {
+            brushSize = parseInt(e.target.value);
+            thicknessVal.innerText = brushSize;
+        });
+        clearBtn.addEventListener('click', () => {
+            ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        });
+
+        // Initialize MediaPipe Hands
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            },
+            width: 640,
+            height: 480
+        });
+        camera.start();
+
+        function onResults(results) {
+            guideCtx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+            
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                
+                // Get finger tips
+                const indexTip = landmarks[8];
+                const indexPip = landmarks[6];
+                const middleTip = landmarks[12];
+                const ringTip = landmarks[16];
+                const pinkyTip = landmarks[20];
+                const wrist = landmarks[0];
+
+                // Convert normalized coords to screen pixels
+                // Note: We mirror the X coordinate because the camera is mirrored
+                const x = (1 - indexTip.x) * drawingCanvas.width;
+                const y = indexTip.y * drawingCanvas.height;
+
+                // Update cursor indicator
+                cursor.style.display = 'block';
+                cursor.style.left = `${x}px`;
+                cursor.style.top = `${y}px`;
+
+                // --- GESTURE LOGIC ---
+                
+                // 1. Detect if hand is open (Eraser)
+                // If all fingers are significantly above the wrist (low Y value)
+                const isHandOpen = indexTip.y < indexPip.y && 
+                                 middleTip.y < landmarks[10].y && 
+                                 ringTip.y < landmarks[14].y && 
+                                 pinkyTip.y < landmarks[18].y;
+
+                // 2. Detect if hand is a fist (Pause)
+                // If fingertips are below their respective PIP joints
+                const isFist = indexTip.y > indexPip.y && 
+                             middleTip.y > landmarks[10].y && 
+                             ringTip.y > landmarks[14].y && 
+                             pinkyTip.y > landmarks[18].y;
+
+                // 3. Detect Pointing (Drawing)
+                // Index is up, others are down
+                const isPointing = indexTip.y < indexPip.y && 
+                                  middleTip.y > landmarks[10].y;
+
+                if (isHandOpen && !isPointing) {
+                    setMode('ERASING');
+                    erase(x, y);
+                } else if (isFist) {
+                    setMode('PAUSED');
+                    isDrawing = false;
+                } else if (isPointing) {
+                    setMode('DRAWING');
+                    draw(x, y);
+                } else {
+                    setMode('IDLE');
+                    isDrawing = false;
+                }
+
+                // Draw tracking guide point
+                guideCtx.beginPath();
+                guideCtx.arc(x, y, 8, 0, 2 * Math.PI);
+                guideCtx.fillStyle = isDrawing ? brushColor : (isErasing ? '#ef4444' : '#ffffff');
+                guideCtx.fill();
+            } else {
+                setMode('PAUSED');
+                isDrawing = false;
+                cursor.style.display = 'none';
+            }
+        }
+
+        function setMode(mode) {
+            statusEl.innerText = mode;
+            statusEl.className = 'status-badge';
+            if (mode === 'DRAWING') statusEl.classList.add('status-drawing');
+            else if (mode === 'ERASING') statusEl.classList.add('status-erasing');
+            else statusEl.classList.add('status-paused');
+            
+            isErasing = (mode === 'ERASING');
+        }
+
+        function draw(x, y) {
+            if (!isDrawing) {
+                isDrawing = true;
+                lastX = x;
+                lastY = y;
+                return;
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            
+            // Neon Style
+            ctx.strokeStyle = brushColor;
+            ctx.lineWidth = brushSize;
+            ctx.shadowBlur = brushSize;
+            ctx.shadowColor = brushColor;
+            
+            ctx.stroke();
+            
+            lastX = x;
+            lastY = y;
+        }
+
+        function erase(x, y) {
+            isDrawing = false;
+            // Clear a circle around the palm
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(x, y, brushSize * 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Draw eraser visual on guide
+            guideCtx.strokeStyle = 'white';
+            guideCtx.lineWidth = 2;
+            guideCtx.beginPath();
+            guideCtx.arc(x, y, brushSize * 3, 0, Math.PI * 2);
+            guideCtx.stroke();
+        }
+    </script>
+</body>
+</html>
