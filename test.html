@@ -1,0 +1,341 @@
+# Air Drawing App (Single HTML File)
+
+Save this as `index.html` and open it in a browser.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Air Drawing App</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      overflow: hidden;
+      background: #050505;
+      color: white;
+    }
+
+    video {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 220px;
+      border-radius: 14px;
+      border: 2px solid #00ffff;
+      transform: scaleX(-1);
+      z-index: 10;
+      box-shadow: 0 0 20px #00ffff;
+    }
+
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #050505;
+      cursor: crosshair;
+    }
+
+    .controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.75);
+      padding: 18px;
+      border-radius: 16px;
+      border: 1px solid #00ffff;
+      box-shadow: 0 0 20px rgba(0,255,255,0.5);
+      backdrop-filter: blur(8px);
+      min-width: 220px;
+    }
+
+    .controls h2 {
+      margin-bottom: 14px;
+      color: #00ffff;
+      text-align: center;
+    }
+
+    .control-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 45px;
+      border: none;
+      border-radius: 10px;
+      background: none;
+      cursor: pointer;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .status {
+      margin-top: 12px;
+      text-align: center;
+      font-weight: bold;
+      color: #00ff99;
+    }
+
+    .guide {
+      margin-top: 15px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #cccccc;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      background: #00ffff;
+      color: black;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      transform: scale(1.03);
+      box-shadow: 0 0 15px #00ffff;
+    }
+  </style>
+</head>
+<body>
+
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+
+  <div class="controls">
+    <h2>Air Drawing</h2>
+
+    <div class="control-group">
+      <label>Brush Color</label>
+      <input type="color" id="colorPicker" value="#00ffff">
+    </div>
+
+    <div class="control-group">
+      <label>Brush Thickness</label>
+      <input type="range" id="brushSize" min="2" max="40" value="8">
+    </div>
+
+    <button id="clearBtn">Clear Canvas</button>
+
+    <div class="status" id="status">Waiting for hand...</div>
+
+    <div class="guide">
+      ☝ One Finger = Draw<br>
+      ✋ Open Palm = Erase<br>
+      ✊ Closed Fist = Pause
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const colorPicker = document.getElementById('colorPicker');
+    const brushSize = document.getElementById('brushSize');
+    const statusText = document.getElementById('status');
+    const clearBtn = document.getElementById('clearBtn');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let lastX = null;
+    let lastY = null;
+
+    let currentMode = 'pause';
+
+    function resizeCanvas() {
+      const temp = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      ctx.putImageData(temp, 0, 0);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    clearBtn.addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    function distance(a, b) {
+      return Math.sqrt(
+        Math.pow(a.x - b.x, 2) +
+        Math.pow(a.y - b.y, 2)
+      );
+    }
+
+    function isFingerUp(tip, pip) {
+      return tip.y < pip.y;
+    }
+
+    function detectGesture(landmarks) {
+      const thumbTip = landmarks[4];
+      const thumbIP = landmarks[3];
+
+      const indexTip = landmarks[8];
+      const indexPIP = landmarks[6];
+
+      const middleTip = landmarks[12];
+      const middlePIP = landmarks[10];
+
+      const ringTip = landmarks[16];
+      const ringPIP = landmarks[14];
+
+      const pinkyTip = landmarks[20];
+      const pinkyPIP = landmarks[18];
+
+      const indexUp = isFingerUp(indexTip, indexPIP);
+      const middleUp = isFingerUp(middleTip, middlePIP);
+      const ringUp = isFingerUp(ringTip, ringPIP);
+      const pinkyUp = isFingerUp(pinkyTip, pinkyPIP);
+
+      const openPalm = indexUp && middleUp && ringUp && pinkyUp;
+
+      const oneFinger = indexUp && !middleUp && !ringUp && !pinkyUp;
+
+      const fist = !indexUp && !middleUp && !ringUp && !pinkyUp;
+
+      if (openPalm) return 'erase';
+      if (oneFinger) return 'draw';
+      if (fist) return 'pause';
+
+      return 'pause';
+    }
+
+    function drawLine(x1, y1, x2, y2) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+
+      ctx.strokeStyle = colorPicker.value;
+      ctx.lineWidth = brushSize.value;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = colorPicker.value;
+
+      ctx.stroke();
+    }
+
+    function eraseAt(x, y) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+
+      ctx.beginPath();
+      ctx.arc(x, y, 35, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    const hands = new Hands({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      }
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.7
+    });
+
+    hands.onResults((results) => {
+      if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+        statusText.innerText = 'No hand detected';
+        lastX = null;
+        lastY = null;
+        return;
+      }
+
+      const landmarks = results.multiHandLandmarks[0];
+
+      const mode = detectGesture(landmarks);
+      currentMode = mode;
+
+      statusText.innerText = mode.toUpperCase();
+
+      const indexFinger = landmarks[8];
+
+      const x = (1 - indexFinger.x) * canvas.width;
+      const y = indexFinger.y * canvas.height;
+
+      if (mode === 'draw') {
+        if (lastX !== null && lastY !== null) {
+          drawLine(lastX, lastY, x, y);
+        }
+
+        lastX = x;
+        lastY = y;
+      }
+      else if (mode === 'erase') {
+        eraseAt(x, y);
+        lastX = null;
+        lastY = null;
+      }
+      else {
+        lastX = null;
+        lastY = null;
+      }
+    });
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({ image: video });
+      },
+      width: 1280,
+      height: 720
+    });
+
+    camera.start();
+
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  </script>
+
+</body>
+</html>
+```
+
+## Features
+
+* MediaPipe hand tracking
+* Neon glowing drawing trail
+* One finger gesture to draw
+* Open palm gesture to erase
+* Closed fist gesture to pause
+* Brush color picker
+* Brush thickness slider
+* Dark modern UI
+* Webcam preview
