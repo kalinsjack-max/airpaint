@@ -3,425 +3,681 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HandConnect — Gesture Visualizer</title>
+<title>✨ Gesture Magic</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;900&display=swap');
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+*{margin:0;padding:0;box-sizing:border-box}
 
-  body {
-    background: #000;
-    font-family: 'Space Mono', monospace;
-    overflow: hidden;
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+:root{
+  --pink:#ff4fa3;
+  --cyan:#00f5ff;
+  --yellow:#ffe94a;
+  --purple:#c084fc;
+  --green:#4aff9f;
+  --orange:#ff9f4a;
+}
 
-  #container {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-  }
+body{
+  background:#0a0010;
+  font-family:'Nunito',sans-serif;
+  overflow:hidden;
+  width:100vw;height:100vh;
+  cursor:none;
+}
 
-  #video {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1);
-    opacity: 0;
-    transition: opacity 0.8s ease;
-  }
+#bg-canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0}
+#draw-canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;transform:scaleX(-1)}
+#video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;transition:opacity 1s;z-index:2;mix-blend-mode:multiply}
+#video.active{opacity:0.35}
+#hand-canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:3;transform:scaleX(-1)}
 
-  #video.active { opacity: 1; }
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:none}
 
-  #canvas {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    transform: scaleX(-1);
-  }
+/* Gesture badge */
+#gesture-badge{
+  position:absolute;
+  top:24px;left:50%;transform:translateX(-50%);
+  background:rgba(10,0,16,0.7);
+  border:2px solid var(--pink);
+  border-radius:50px;
+  padding:10px 28px;
+  display:flex;align-items:center;gap:12px;
+  backdrop-filter:blur(10px);
+  transition:border-color 0.3s;
+  pointer-events:none;
+}
+#gesture-emoji{font-size:28px;line-height:1}
+#gesture-name{
+  font-family:'Fredoka One',cursive;
+  font-size:20px;
+  color:#fff;
+  letter-spacing:0.05em;
+  min-width:90px;
+  text-align:left;
+}
 
-  #hud {
-    position: absolute;
-    top: 20px; left: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    z-index: 10;
-  }
+/* Guide panel */
+#guide{
+  position:absolute;
+  right:20px;top:50%;transform:translateY(-50%);
+  background:rgba(10,0,16,0.75);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:16px;
+  padding:16px;
+  backdrop-filter:blur(10px);
+  width:190px;
+}
+#guide h3{
+  font-family:'Fredoka One',cursive;
+  font-size:15px;color:var(--yellow);
+  margin-bottom:10px;letter-spacing:0.05em;
+  text-align:center;
+}
+.g-row{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:8px;font-size:12px;color:rgba(255,255,255,0.75);
+  line-height:1.3;
+}
+.g-row .em{font-size:18px;min-width:24px;text-align:center}
+.g-row strong{color:#fff;display:block;font-size:12px}
 
-  .hud-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
+/* HUD bottom */
+#hud{
+  position:absolute;bottom:20px;left:20px;
+  display:flex;flex-direction:column;gap:5px;
+}
+.hud-item{
+  font-size:11px;color:rgba(255,255,255,0.35);
+  font-family:'Nunito',sans-serif;letter-spacing:0.08em;
+  text-transform:uppercase;
+}
+.hud-item span{color:var(--cyan);font-weight:700}
 
-  .hud-label {
-    font-size: 11px;
-    color: rgba(255,255,255,0.4);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    min-width: 90px;
-  }
+/* Clear btn */
+#clear-btn{
+  position:absolute;bottom:20px;right:20px;
+  background:rgba(255,79,163,0.15);
+  border:1px solid var(--pink);
+  color:var(--pink);
+  font-family:'Fredoka One',cursive;
+  font-size:14px;letter-spacing:0.05em;
+  padding:8px 20px;border-radius:50px;
+  cursor:pointer;pointer-events:all;
+  transition:all 0.2s;
+}
+#clear-btn:hover{background:rgba(255,79,163,0.3)}
 
-  .hud-value {
-    font-size: 12px;
-    font-weight: 700;
-    color: #00ffb3;
-    letter-spacing: 0.05em;
-    transition: color 0.2s;
-  }
+/* Splash screen */
+#splash{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:#0a0010;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;
+  transition:opacity 0.8s;
+}
+#splash h1{
+  font-family:'Fredoka One',cursive;
+  font-size:clamp(3rem,8vw,6rem);
+  background:linear-gradient(135deg,var(--pink),var(--purple),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+  text-align:center;line-height:1.1;
+  animation:float 3s ease-in-out infinite;
+}
+#splash p{
+  font-size:16px;color:rgba(255,255,255,0.5);
+  text-align:center;max-width:400px;line-height:1.6;
+}
+#splash-btn{
+  margin-top:10px;
+  padding:14px 40px;
+  background:linear-gradient(135deg,var(--pink),var(--purple));
+  border:none;border-radius:50px;
+  color:#fff;font-family:'Fredoka One',cursive;
+  font-size:20px;letter-spacing:0.05em;
+  cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;
+  box-shadow:0 0 30px rgba(255,79,163,0.4);
+}
+#splash-btn:hover{transform:scale(1.05);box-shadow:0 0 50px rgba(255,79,163,0.6)}
 
-  .hud-value.warn { color: #ff4fa3; }
-  .hud-value.info { color: #a78bff; }
+/* effect overlays */
+#rain-overlay{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  z-index:8;pointer-events:none;overflow:hidden;
+}
+.raindrop{
+  position:absolute;top:-20px;
+  font-size:22px;
+  animation:rain linear forwards;
+}
+@keyframes rain{to{transform:translateY(110vh) rotate(20deg);opacity:0}}
 
-  #title-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    z-index: 20;
-    pointer-events: none;
-    transition: opacity 0.8s ease;
-  }
+#flash-overlay{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  z-index:9;pointer-events:none;
+  background:rgba(255,255,255,0);
+  transition:background 0.1s;
+}
 
-  #title-overlay h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(2rem, 5vw, 3.5rem);
-    font-weight: 800;
-    color: #fff;
-    line-height: 1.1;
-    text-shadow: 0 0 40px rgba(0,255,179,0.3);
-  }
+#mode-label{
+  position:absolute;top:80px;left:50%;transform:translateX(-50%);
+  font-family:'Fredoka One',cursive;
+  font-size:14px;letter-spacing:0.1em;
+  color:rgba(255,255,255,0.4);
+  text-transform:uppercase;pointer-events:none;
+  text-align:center;
+}
 
-  #title-overlay p {
-    margin-top: 1rem;
-    font-size: 13px;
-    color: rgba(255,255,255,0.5);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  #start-btn {
-    margin-top: 2rem;
-    padding: 12px 32px;
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.3);
-    color: #fff;
-    font-family: 'Space Mono', monospace;
-    font-size: 13px;
-    letter-spacing: 0.1em;
-    cursor: pointer;
-    pointer-events: all;
-    transition: all 0.2s;
-    text-transform: uppercase;
-  }
-
-  #start-btn:hover {
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(0,255,179,0.6);
-    color: #00ffb3;
-  }
-
-  #loading {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    z-index: 25;
-    display: none;
-  }
-
-  #loading p {
-    font-family: 'Syne', sans-serif;
-    font-size: 14px;
-    color: rgba(255,255,255,0.5);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 1; }
-  }
-
-  #corner-br {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    font-size: 10px;
-    color: rgba(255,255,255,0.2);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    z-index: 10;
-  }
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+@keyframes popIn{0%{transform:scale(0) rotate(-20deg);opacity:0}60%{transform:scale(1.2) rotate(5deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+@keyframes fadeUp{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-60px)}}
 </style>
 </head>
 <body>
 
-<div id="container">
-  <video id="video" playsinline autoplay muted></video>
-  <canvas id="canvas"></canvas>
+<canvas id="bg-canvas"></canvas>
+<canvas id="draw-canvas"></canvas>
+<video id="video" playsinline autoplay muted></video>
+<canvas id="hand-canvas"></canvas>
+
+<div id="ui">
+  <div id="gesture-badge">
+    <span id="gesture-emoji">🤚</span>
+    <span id="gesture-name">Ready</span>
+  </div>
+  <div id="mode-label" id="mode-label">✏️ Draw Mode</div>
+
+  <div id="guide">
+    <h3>✨ Gesture Guide</h3>
+    <div class="g-row"><span class="em">☝️</span><div><strong>Point</strong>Draw sparkles</div></div>
+    <div class="g-row"><span class="em">✌️</span><div><strong>Peace</strong>Rainbow trail</div></div>
+    <div class="g-row"><span class="em">🤟</span><div><strong>Love</strong>Auto-draw hearts</div></div>
+    <div class="g-row"><span class="em">✊</span><div><strong>Fist</strong>Explosion burst</div></div>
+    <div class="g-row"><span class="em">🖐️</span><div><strong>Open</strong>Star shower</div></div>
+    <div class="g-row"><span class="em">🤌</span><div><strong>Pinch</strong>Gravity pull</div></div>
+    <div class="g-row"><span class="em">🤙</span><div><strong>Shaka</strong>Screen flash</div></div>
+    <div class="g-row"><span class="em">👍</span><div><strong>Thumbs up</strong>Confetti!</div></div>
+  </div>
 
   <div id="hud">
-    <div class="hud-row">
-      <span class="hud-label">Hands</span>
-      <span class="hud-value" id="hud-hands">0</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">FPS</span>
-      <span class="hud-value" id="hud-fps">—</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">Gesture</span>
-      <span class="hud-value info" id="hud-gesture">—</span>
-    </div>
-    <div class="hud-row">
-      <span class="hud-label">Spread</span>
-      <span class="hud-value warn" id="hud-spread">—</span>
-    </div>
+    <div class="hud-item">Hands: <span id="hud-hands">0</span></div>
+    <div class="hud-item">FPS: <span id="hud-fps">—</span></div>
+    <div class="hud-item">Particles: <span id="hud-particles">0</span></div>
   </div>
 
-  <div id="title-overlay">
-    <h1>Hand<br>Connect</h1>
-    <p>Gesture Visualizer</p>
-    <button id="start-btn" onclick="startCamera()">Enable Camera</button>
-  </div>
+  <button id="clear-btn" onclick="clearDrawing()">🗑 Clear</button>
+  <div id="rain-overlay"></div>
+  <div id="flash-overlay"></div>
+</div>
 
-  <div id="loading">
-    <p>Loading model…</p>
-  </div>
-
-  <div id="corner-br">HandConnect v2</div>
+<div id="splash">
+  <h1>✨ Gesture<br>Magic ✨</h1>
+  <p>Draw with your hands! Make gestures to trigger magical effects. Point to sparkle, show love to draw hearts, fist for explosions!</p>
+  <button id="splash-btn" onclick="startApp()">🎥 Start Magic</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-
 <script>
+const bgCanvas = document.getElementById('bg-canvas');
+const drawCanvas = document.getElementById('draw-canvas');
+const handCanvas = document.getElementById('hand-canvas');
 const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const bgCtx = bgCanvas.getContext('2d');
+const drawCtx = drawCanvas.getContext('2d');
+const handCtx = handCanvas.getContext('2d');
 
-const CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,4],
-  [0,5],[5,6],[6,7],[7,8],
-  [9,10],[10,11],[11,12],
-  [13,14],[14,15],[15,16],
-  [0,17],[17,18],[18,19],[19,20],
-  [5,9],[9,13],[13,17]
-];
-
-const FINGER_COLORS = [
-  '#ff4fa3','#ff9f4a','#ffe94a','#4aff9f','#4ab0ff'
-];
-
-let lastTime = 0;
-let fps = 0;
-let frameCount = 0;
-let fpsTimer = 0;
-let currentHands = [];
+let W = window.innerWidth, H = window.innerHeight;
+let particles = [];
+let bgStars = [];
+let fps = 0, frameCount = 0, fpsTimer = 0;
 let hue = 0;
+let lastGesture = '';
+let gestureHoldTime = 0;
+let lastExplosion = 0;
+let lastLove = 0;
+let lastShake = 0;
+let lastConfetti = 0;
+let lastStarShower = 0;
+let prevIndexTip = null;
+let drawMode = 'sparkle';
+let bgAnimFrame;
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+function resize(){
+  W = window.innerWidth; H = window.innerHeight;
+  [bgCanvas, drawCanvas, handCanvas].forEach(c=>{c.width=W;c.height=H});
 }
 resize();
 window.addEventListener('resize', resize);
 
-function detectGesture(lm) {
-  const tips = [4, 8, 12, 16, 20];
-  const mcp  = [2, 5, 9, 13, 17];
-  let extended = 0;
-  for (let i = 1; i < 5; i++) {
-    if (lm[tips[i]].y < lm[mcp[i]].y) extended++;
+// ─── Background animated stars ───
+function initBgStars(){
+  bgStars = Array.from({length:120},()=>({
+    x:Math.random()*W, y:Math.random()*H,
+    r:Math.random()*1.5+0.3,
+    a:Math.random(),
+    speed:Math.random()*0.005+0.002
+  }));
+}
+initBgStars();
+
+function drawBg(){
+  bgCtx.fillStyle='#0a0010';
+  bgCtx.fillRect(0,0,W,H);
+  bgStars.forEach(s=>{
+    s.a += s.speed;
+    const alpha = (Math.sin(s.a)+1)/2 * 0.6 + 0.1;
+    bgCtx.beginPath();
+    bgCtx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    bgCtx.fillStyle=`rgba(255,255,255,${alpha})`;
+    bgCtx.fill();
+  });
+  requestAnimationFrame(drawBg);
+}
+drawBg();
+
+// ─── Particle system ───
+class Particle{
+  constructor(x,y,type='sparkle'){
+    this.x=x; this.y=y; this.type=type;
+    this.life=1;
+    const speed=type==='explosion'?8:type==='star'?5:type==='confetti'?4:3;
+    const angle=Math.random()*Math.PI*2;
+    this.vx=Math.cos(angle)*(Math.random()*speed+1);
+    this.vy=Math.sin(angle)*(Math.random()*speed+1)-(type==='sparkle'?2:0);
+    this.decay=type==='explosion'?0.025:type==='trail'?0.03:type==='confetti'?0.012:0.02;
+    this.size=type==='explosion'?(Math.random()*8+4):type==='star'?(Math.random()*6+4):type==='heart'?16:(Math.random()*4+2);
+    this.hue=(hue+Math.random()*60-30+360)%360;
+    this.gravity=type==='confetti'?0.15:type==='star'?0.05:type==='explosion'?0.1:0;
+    this.text=type==='heart'?'❤️':type==='star'?'⭐':type==='confetti'?['🎉','🎊','✨','💫','🌟'][Math.floor(Math.random()*5)]:null;
+    this.rotation=Math.random()*Math.PI*2;
+    this.rotSpeed=(Math.random()-0.5)*0.2;
   }
-  const thumbOpen = Math.abs(lm[4].x - lm[0].x) > 0.08;
-  const d48 = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
-  if (d48 < 0.06) return 'PINCH';
-  if (extended === 0) return 'FIST';
-  if (extended === 4 && thumbOpen) return 'OPEN';
-  if (extended === 1 && lm[tips[1]].y < lm[mcp[1]].y) return 'POINT';
-  if (extended === 2) return 'PEACE';
-  if (extended === 4) return 'FOUR';
-  return 'HAND';
+  update(){
+    this.x+=this.vx; this.y+=this.vy;
+    this.vy+=this.gravity;
+    this.vx*=0.98; this.vy*=0.98;
+    this.life-=this.decay;
+    this.rotation+=this.rotSpeed;
+  }
+  draw(ctx){
+    if(this.life<=0)return;
+    ctx.save();
+    ctx.globalAlpha=Math.max(0,this.life);
+    if(this.text){
+      ctx.translate(this.x,this.y);
+      ctx.rotate(this.rotation);
+      ctx.font=`${this.size*this.life+8}px serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(this.text,0,0);
+    } else {
+      ctx.shadowBlur=12;
+      ctx.shadowColor=`hsla(${this.hue},100%,70%,${this.life})`;
+      ctx.fillStyle=`hsla(${this.hue},100%,70%,${this.life})`;
+      const s=this.size*this.life;
+      ctx.beginPath();
+      ctx.arc(this.x,this.y,Math.max(0.1,s),0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 }
 
-function getSpread(h1, h2) {
-  const cx1 = h1.reduce((s,p) => s + p.x, 0) / h1.length;
-  const cy1 = h1.reduce((s,p) => s + p.y, 0) / h1.length;
-  const cx2 = h2.reduce((s,p) => s + p.x, 0) / h2.length;
-  const cy2 = h2.reduce((s,p) => s + p.y, 0) / h2.length;
-  return Math.round(Math.hypot(cx2 - cx1, cy2 - cy1) * 100);
+// ─── Drawing trail ───
+let trailPoints = [];
+const MAX_TRAIL = 80;
+
+function addSparkleTrail(x, y, gestureType){
+  const rx = W - x; // mirror for display
+  trailPoints.push({x:rx,y,time:Date.now()});
+  if(trailPoints.length>MAX_TRAIL) trailPoints.shift();
+
+  // Draw persistent sparkle on draw canvas
+  const count = gestureType==='peace'?6:gestureType==='love'?3:4;
+  for(let i=0;i<count;i++){
+    const ox=rx+(Math.random()-0.5)*20;
+    const oy=y+(Math.random()-0.5)*20;
+    const h2=(hue+Math.random()*120)%360;
+    drawCtx.save();
+    drawCtx.globalAlpha=0.7;
+    drawCtx.shadowBlur=20;
+    drawCtx.shadowColor=`hsla(${h2},100%,70%,1)`;
+    drawCtx.fillStyle=`hsla(${h2},100%,80%,1)`;
+    const r=gestureType==='peace'?3:2;
+    drawCtx.beginPath();
+    drawCtx.arc(ox,oy,r,0,Math.PI*2);
+    drawCtx.fill();
+    drawCtx.restore();
+  }
+
+  // Glow line
+  if(trailPoints.length>1){
+    const prev=trailPoints[trailPoints.length-2];
+    drawCtx.save();
+    drawCtx.globalAlpha=0.5;
+    const lw=gestureType==='peace'?6:gestureType==='love'?4:3;
+    drawCtx.lineWidth=lw;
+    drawCtx.strokeStyle=`hsla(${hue},100%,70%,0.8)`;
+    drawCtx.shadowBlur=15;
+    drawCtx.shadowColor=`hsla(${hue},100%,60%,0.6)`;
+    drawCtx.lineCap='round';
+    drawCtx.beginPath();
+    drawCtx.moveTo(prev.x,prev.y);
+    drawCtx.lineTo(rx,y);
+    drawCtx.stroke();
+    drawCtx.restore();
+  }
+
+  // Floating particles
+  if(Math.random()<0.4){
+    const p=new Particle(rx,y,gestureType==='peace'?'trail':'sparkle');
+    p.hue=(hue+Math.random()*180)%360;
+    particles.push(p);
+  }
 }
 
-function lp(lm, idx) {
-  return {
-    x: lm[idx].x * canvas.width,
-    y: lm[idx].y * canvas.height
-  };
+// ─── Heart drawing ───
+let heartAutoTimer = 0;
+let heartPath = [];
+let heartStep = 0;
+
+function buildHeartPath(cx, cy, size){
+  const pts=[];
+  for(let t=0;t<=Math.PI*2;t+=0.12){
+    const hx=cx+size*(16*Math.pow(Math.sin(t),3))/16;
+    const hy=cy-size*(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))/16;
+    pts.push({x:hx,y:hy});
+  }
+  return pts;
 }
 
-function drawHand(lm, colorShift) {
-  CONNECTIONS.forEach(([a, b], i) => {
-    const pa = lp(lm, a);
-    const pb = lp(lm, b);
-    const fingerIdx = Math.min(Math.floor(i / 4), 4);
-    const baseHue = (hue + colorShift + fingerIdx * 36) % 360;
+function drawHeartStep(){
+  if(heartStep>=heartPath.length) return;
+  const p=heartPath[heartStep];
+  drawCtx.save();
+  drawCtx.shadowBlur=20;
+  drawCtx.shadowColor='#ff4fa3';
+  drawCtx.fillStyle=`hsl(${330+Math.sin(heartStep*0.3)*30},100%,70%)`;
+  drawCtx.beginPath();
+  drawCtx.arc(p.x,p.y,3,0,Math.PI*2);
+  drawCtx.fill();
+  drawCtx.restore();
+  if(heartStep>0){
+    const pp=heartPath[heartStep-1];
+    drawCtx.save();
+    drawCtx.lineWidth=3;drawCtx.strokeStyle='rgba(255,79,163,0.7)';
+    drawCtx.shadowBlur=15;drawCtx.shadowColor='#ff4fa3';
+    drawCtx.lineCap='round';
+    drawCtx.beginPath();drawCtx.moveTo(pp.x,pp.y);drawCtx.lineTo(p.x,p.y);drawCtx.stroke();
+    drawCtx.restore();
+  }
+  particles.push(new Particle(p.x,p.y,'heart'));
+  heartStep++;
+}
 
-    ctx.beginPath();
-    ctx.moveTo(pa.x, pa.y);
-    ctx.lineTo(pb.x, pb.y);
-    ctx.strokeStyle = `hsla(${baseHue}, 100%, 65%, 0.9)`;
-    ctx.lineWidth = 2.5;
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = `hsla(${baseHue}, 100%, 65%, 0.6)`;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+// ─── Gesture effects ───
+function triggerExplosion(x,y){
+  const now=Date.now();
+  if(now-lastExplosion<400)return;
+  lastExplosion=now;
+  const rx=W-x;
+  for(let i=0;i<50;i++) particles.push(new Particle(rx,y,'explosion'));
+  // flash
+  const fl=document.getElementById('flash-overlay');
+  fl.style.background='rgba(255,200,100,0.25)';
+  setTimeout(()=>fl.style.background='rgba(255,255,255,0)',120);
+  showFloatingText(rx,y,'💥 BOOM!','#ffaa00');
+}
+
+function triggerStarShower(){
+  const now=Date.now();
+  if(now-lastStarShower<600)return;
+  lastStarShower=now;
+  for(let i=0;i<30;i++){
+    setTimeout(()=>{
+      const p=new Particle(Math.random()*W,Math.random()*50,'star');
+      p.vy=Math.abs(p.vy)+2;
+      particles.push(p);
+    },i*40);
+  }
+  showFloatingText(W/2,100,'⭐ STAR SHOWER!','#ffe94a');
+}
+
+function triggerConfetti(){
+  const now=Date.now();
+  if(now-lastConfetti<600)return;
+  lastConfetti=now;
+  for(let i=0;i<60;i++){
+    setTimeout(()=>{
+      const p=new Particle(Math.random()*W,-20,'confetti');
+      p.vy=Math.abs(p.vy)+2;
+      particles.push(p);
+    },i*20);
+  }
+  showFloatingText(W/2,80,'🎉 CONFETTI!','#c084fc');
+}
+
+function triggerShaka(){
+  const now=Date.now();
+  if(now-lastShake<800)return;
+  lastShake=now;
+  const fl=document.getElementById('flash-overlay');
+  fl.style.background='rgba(0,245,255,0.2)';
+  setTimeout(()=>fl.style.background='rgba(255,255,255,0)',200);
+  for(let i=0;i<20;i++) particles.push(new Particle(Math.random()*W,Math.random()*H,'sparkle'));
+  showFloatingText(W/2,H/2,'🤙 SHAKA BRO!','#00f5ff');
+}
+
+function triggerGravityPull(x,y){
+  const rx=W-x;
+  particles.forEach(p=>{
+    const dx=rx-p.x, dy=y-p.y;
+    const dist=Math.hypot(dx,dy)+1;
+    const force=300/dist;
+    p.vx+=dx/dist*force*0.05;
+    p.vy+=dy/dist*force*0.05;
   });
+}
 
-  lm.forEach((pt, i) => {
-    const p = lp(lm, i);
-    const baseHue = (hue + colorShift + Math.floor(i / 4) * 36) % 360;
-    const isJoint = [4,8,12,16,20].includes(i);
+function showFloatingText(x,y,text,color){
+  const el=document.createElement('div');
+  el.style.cssText=`
+    position:fixed;left:${x}px;top:${y}px;transform:translate(-50%,-50%);
+    font-family:'Fredoka One',cursive;font-size:22px;color:${color};
+    pointer-events:none;z-index:50;white-space:nowrap;
+    text-shadow:0 0 20px ${color};
+    animation:fadeUp 1.2s ease-out forwards;
+  `;
+  el.textContent=text;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1300);
+}
 
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, isJoint ? 5 : 3, 0, Math.PI * 2);
-    ctx.fillStyle = `hsla(${baseHue}, 100%, 80%, 1)`;
-    ctx.shadowBlur = 16;
-    ctx.shadowColor = `hsla(${baseHue}, 100%, 65%, 0.8)`;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+// ─── Gesture detection ───
+const CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[9,10],[10,11],[11,12],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+
+function detectGesture(lm){
+  const tips=[4,8,12,16,20];
+  const pip=[3,6,10,14,18];
+  let ext=[];
+  for(let i=1;i<5;i++) ext.push(lm[tips[i]].y<lm[pip[i]].y);
+  const thumbOut=Math.abs(lm[4].x-lm[2].x)>0.06;
+  const d48=Math.hypot(lm[4].x-lm[8].x,lm[4].y-lm[8].y);
+  const d4tip=Math.hypot(lm[4].x-lm[12].x,lm[4].y-lm[12].y);
+  const pinkyOut=lm[20].y<lm[18].y;
+  const ringDown=lm[16].y>lm[14].y;
+  const middleDown=lm[12].y>lm[10].y;
+
+  if(d48<0.07) return {name:'Pinch',emoji:'🤌',color:'#c084fc'};
+  if(!ext[0]&&!ext[1]&&!ext[2]&&!ext[3]) return {name:'Fist',emoji:'✊',color:'#ff9f4a'};
+  if(ext[0]&&ext[1]&&ext[2]&&ext[3]&&thumbOut) return {name:'Open',emoji:'🖐️',color:'#4aff9f'};
+  if(ext[0]&&ext[3]&&!ext[1]&&!ext[2]) return {name:'Love ❤️',emoji:'🤟',color:'#ff4fa3'};
+  if(thumbOut&&!ext[0]&&!ext[1]&&!ext[2]&&!ext[3]) return {name:'Thumbs Up',emoji:'👍',color:'#ffe94a'};
+  if(thumbOut&&pinkyOut&&!ext[0]&&middleDown&&ringDown) return {name:'Shaka',emoji:'🤙',color:'#00f5ff'};
+  if(ext[0]&&!ext[1]&&!ext[2]&&!ext[3]) return {name:'Point',emoji:'☝️',color:'#fff'};
+  if(ext[0]&&ext[1]&&!ext[2]&&!ext[3]) return {name:'Peace',emoji:'✌️',color:'#4ab0ff'};
+  if(ext[0]&&ext[1]&&ext[2]&&ext[3]) return {name:'Four',emoji:'4️⃣',color:'#c084fc'};
+  return {name:'Hand',emoji:'🖐️',color:'#fff'};
+}
+
+function lp(lm,idx){return{x:lm[idx].x*W,y:lm[idx].y*H}}
+
+function drawHandSkeleton(lm, colorHue){
+  CONN.forEach(([a,b])=>{
+    const pa=lp(lm,a), pb=lp(lm,b);
+    handCtx.beginPath();
+    handCtx.moveTo(pa.x,pa.y);handCtx.lineTo(pb.x,pb.y);
+    handCtx.strokeStyle=`hsla(${colorHue},90%,65%,0.7)`;
+    handCtx.lineWidth=2;
+    handCtx.shadowBlur=8;
+    handCtx.shadowColor=`hsla(${colorHue},100%,60%,0.5)`;
+    handCtx.stroke();
+    handCtx.shadowBlur=0;
+  });
+  [4,8,12,16,20,0].forEach(i=>{
+    const p=lp(lm,i);
+    handCtx.beginPath();
+    handCtx.arc(p.x,p.y,i===0?5:4,0,Math.PI*2);
+    handCtx.fillStyle=`hsla(${colorHue},100%,75%,0.9)`;
+    handCtx.shadowBlur=12;handCtx.shadowColor=`hsla(${colorHue},100%,60%,0.6)`;
+    handCtx.fill();handCtx.shadowBlur=0;
   });
 }
 
-function drawConnectingBeams(h1, h2) {
-  const tips = [4, 8, 12, 16, 20];
-  tips.forEach((tipIdx, i) => {
-    const pa = lp(h1, tipIdx);
-    const pb = lp(h2, tipIdx);
-    const beamHue = (hue + i * 60) % 360;
+// ─── Main render loop ───
+function renderParticles(){
+  handCtx.clearRect(0,0,W,H);
+  hue=(hue+0.8)%360;
+  const now=Date.now();
 
-    const grad = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
-    grad.addColorStop(0, `hsla(${beamHue}, 100%, 65%, 0.85)`);
-    grad.addColorStop(0.5, `hsla(${(beamHue + 30) % 360}, 100%, 80%, 0.95)`);
-    grad.addColorStop(1, `hsla(${(beamHue + 60) % 360}, 100%, 65%, 0.85)`);
+  // Update & draw particles on hand canvas (not persistent)
+  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{p.update();p.draw(handCtx)});
 
-    ctx.beginPath();
-    ctx.moveTo(pa.x, pa.y);
-    ctx.lineTo(pb.x, pb.y);
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = 2;
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = `hsla(${beamHue}, 100%, 65%, 0.5)`;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  });
+  // Fade draw canvas slightly (optional: comment out to keep everything)
+  // drawCtx.fillStyle='rgba(10,0,16,0.003)';
+  // drawCtx.fillRect(0,0,W,H);
 
-  const wrist1 = lp(h1, 0);
-  const wrist2 = lp(h2, 0);
-  const wristHue = (hue + 180) % 360;
-  const grad2 = ctx.createLinearGradient(wrist1.x, wrist1.y, wrist2.x, wrist2.y);
-  grad2.addColorStop(0, `hsla(${wristHue}, 100%, 60%, 0.6)`);
-  grad2.addColorStop(1, `hsla(${(wristHue + 120) % 360}, 100%, 60%, 0.6)`);
-  ctx.beginPath();
-  ctx.moveTo(wrist1.x, wrist1.y);
-  ctx.lineTo(wrist2.x, wrist2.y);
-  ctx.strokeStyle = grad2;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([6, 6]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-}
+  document.getElementById('hud-particles').textContent=particles.length;
 
-function drawFrame(results) {
-  const now = performance.now();
+  // FPS
   frameCount++;
-  if (now - fpsTimer >= 1000) {
-    fps = frameCount;
-    frameCount = 0;
-    fpsTimer = now;
+  if(now-fpsTimer>=1000){fps=frameCount;frameCount=0;fpsTimer=now}
+  document.getElementById('hud-fps').textContent=fps;
+
+  requestAnimationFrame(renderParticles);
+}
+renderParticles();
+
+// ─── MediaPipe ───
+function processResults(results){
+  const hands=results.multiHandLandmarks||[];
+  document.getElementById('hud-hands').textContent=hands.length;
+  handCtx.clearRect(0,0,W,H);
+
+  if(hands.length===0){
+    updateBadge({name:'Ready',emoji:'🤚',color:'#fff'});
+    prevIndexTip=null; trailPoints=[];
+    return;
   }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  hue = (hue + 0.5) % 360;
+  hands.forEach((lm,i)=>{
+    const gesture=detectGesture(lm);
+    updateBadge(gesture);
+    drawHandSkeleton(lm,(hue+i*120)%360);
 
-  const hands = results.multiHandLandmarks || [];
-  currentHands = hands;
+    const indexTip=lm[8];
+    const rx=indexTip.x*W;
+    const ry=indexTip.y*H;
 
-  document.getElementById('hud-hands').textContent = hands.length;
-  document.getElementById('hud-fps').textContent = fps;
+    // Draw mode label
+    document.getElementById('mode-label').textContent=
+      gesture.name==='Peace'?'🌈 Rainbow Mode':
+      gesture.name==='Love ❤️'?'❤️ Love Mode':
+      gesture.name==='Fist'?'💥 Explosion Mode':
+      gesture.name==='Point'?'✨ Sparkle Draw':'';
 
-  if (hands.length === 0) {
-    document.getElementById('hud-gesture').textContent = '—';
-    document.getElementById('hud-spread').textContent = '—';
-  }
+    if(gesture.name==='Point'){
+      addSparkleTrail(rx,ry,'point');
+      hue+=1;
+    } else if(gesture.name==='Peace'){
+      addSparkleTrail(rx,ry,'peace');
+      hue+=2;
+    } else if(gesture.name==='Love ❤️'){
+      const now=Date.now();
+      if(now-lastLove>600){
+        lastLove=now;
+        const cx=W-rx, cy=ry;
+        heartPath=buildHeartPath(cx,cy,60+(Math.random()*30));
+        heartStep=0;
+        // draw heart progressively
+        const heartInterval=setInterval(()=>{
+          drawHeartStep();
+          if(heartStep>=heartPath.length){clearInterval(heartInterval)}
+        },18);
+        showFloatingText(W-rx,ry,'❤️ Love!','#ff4fa3');
+        for(let k=0;k<15;k++) setTimeout(()=>particles.push(new Particle(W-rx+Math.random()*80-40,ry+Math.random()*80-40,'heart')),k*40);
+      }
+    } else if(gesture.name==='Fist'){
+      triggerExplosion(rx,ry);
+    } else if(gesture.name==='Open'){
+      triggerStarShower();
+    } else if(gesture.name==='Thumbs Up'){
+      triggerConfetti();
+    } else if(gesture.name==='Shaka'){
+      triggerShaka();
+    } else if(gesture.name==='Pinch'){
+      triggerGravityPull(rx,ry);
+    } else {
+      trailPoints=[];prevIndexTip=null;
+    }
 
-  hands.forEach((lm, i) => {
-    drawHand(lm, i * 120);
-    const gesture = detectGesture(lm);
-    document.getElementById('hud-gesture').textContent = gesture;
+    prevIndexTip={x:rx,y:ry};
   });
-
-  if (hands.length === 2) {
-    drawConnectingBeams(hands[0], hands[1]);
-    const spread = getSpread(hands[0], hands[1]);
-    document.getElementById('hud-spread').textContent = spread + '%';
-  } else {
-    document.getElementById('hud-spread').textContent = '—';
-  }
 }
 
-async function startCamera() {
-  const titleOverlay = document.getElementById('title-overlay');
-  const loadingDiv = document.getElementById('loading');
+function updateBadge(g){
+  document.getElementById('gesture-emoji').textContent=g.emoji;
+  document.getElementById('gesture-name').textContent=g.name;
+  document.getElementById('gesture-badge').style.borderColor=g.color;
+  document.getElementById('gesture-name').style.color=g.color;
+}
 
-  titleOverlay.style.opacity = '0';
-  setTimeout(() => { titleOverlay.style.display = 'none'; }, 800);
-  loadingDiv.style.display = 'block';
+// ─── Start ───
+async function startApp(){
+  const splash=document.getElementById('splash');
+  splash.style.opacity='0';
+  setTimeout(()=>splash.style.display='none',800);
 
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({
+      video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}
     });
-    video.srcObject = stream;
+    video.srcObject=stream;
     video.classList.add('active');
 
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    const hands=new Hands({
+      locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
     });
+    hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:0.7,minTrackingConfidence:0.6});
+    hands.onResults(processResults);
 
-    hands.setOptions({
-      maxNumHands: 2,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.6
-    });
-
-    hands.onResults((results) => {
-      loadingDiv.style.display = 'none';
-      drawFrame(results);
-    });
-
-    const camera = new Camera(video, {
-      onFrame: async () => { await hands.send({ image: video }); },
-      width: 1280,
-      height: 720
+    const camera=new Camera(video,{
+      onFrame:async()=>{await hands.send({image:video})},
+      width:1280,height:720
     });
     camera.start();
-
-  } catch (err) {
-    loadingDiv.innerHTML = `<p style="color:#ff4fa3">Camera access denied.<br>Please allow camera permissions.</p>`;
-    console.error(err);
+  }catch(e){
+    alert('Camera access needed! Please allow camera permissions and refresh.');
   }
+}
+
+function clearDrawing(){
+  drawCtx.clearRect(0,0,W,H);
+  particles=[];
+  trailPoints=[];
+  showFloatingText(W/2,H/2,'🗑 Cleared!','rgba(255,255,255,0.7)');
 }
 </script>
 </body>
